@@ -4,19 +4,71 @@ import { useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './ChoroplethMap.css';
+// @ts-ignore
+import RegionInfo from './RegionInfo.tsx';
 
-function getRandomColor() {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
-    for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-}
 
 const ChoroplethMap: FC = () => {
     const [selectedRegion, setSelectedRegion] = useState(null);
     const [selectedDistrict, setSelectedDistrict] = useState(null);
+    const [regionData, setRegionData] = useState(null);
+    const [regionColors, setRegionColors] = useState({});
+    const [districtColors, setDistrictColors] = useState({});
+    const generateRegionColors = (provincesFeatures, districtsFeatures, type) => {
+        const colors = {};
+
+        if (type === "province") {
+            provincesFeatures.forEach((feature) => {
+                const provinceId = feature.properties.adm1;
+                colors[provinceId] = generateRandomColor();
+            });
+        } else if (type === "district") {
+            districtsFeatures.forEach((feature) => {
+                const districtId = feature.properties.OBJECTID;
+                colors[districtId] = generateRandomColor();
+            });
+        }
+
+        return colors;
+    };
+
+
+
+    const assignProvinceColors = (map, colors) => {
+        map.setPaintProperty('provinces', 'fill-color', [
+            'match',
+            ['get', 'adm1'],
+            ...[].concat(
+                ...Object.entries(colors).map(([code, color]) => [code, color])
+            ),
+            '#ccc' // fallback color for unmatched provinces
+        ]);
+    };
+
+    const assignDistrictColors = (map, colors) => {
+        map.setPaintProperty('districts', 'fill-color', [
+            'match',
+            ['get', 'OBJECTID'],
+            ...[].concat(
+                ...Object.entries(colors).map(([code, color]) => [code, color])
+            ),
+            '#ccc' // fallback color for unmatched districts
+        ]);
+    };
+
+
+
+    const generateRandomColor = () => {
+        const party = Math.floor(Math.random() * 3);
+        if (party === 0) {
+            return '#D71920'; // CHP (Red)
+        } else if (party === 1) {
+            return '#FDC400'; // AKP (Yellow)
+        } else {
+            return '#00ADEF'; // Millet Partisi (Blue)
+        }
+    };
+
     useEffect(() => {
         mapboxgl.accessToken = 'pk.eyJ1IjoiYmFoYWRpcnMiLCJhIjoiY2xmODgweThvMHloejN5cGNzb3YweHEwbCJ9.YETxjRCm89gcEnvasviDcQ';
 
@@ -28,9 +80,11 @@ const ChoroplethMap: FC = () => {
             zoom: 5,
         });
 
+
         const zoomThreshold = 2;
 
         map.on('load', () => {
+
             // Türkiye'nin illeri için kaynak ekleyin
             map.addSource('turkey_provinces', {
                 'type': 'vector',
@@ -52,6 +106,8 @@ const ChoroplethMap: FC = () => {
                 'type': 'vector',
                 'url': 'mapbox://bahadirs.10m5bvn0'
             });
+
+
             map.addLayer({
                 'id': 'province-outline',
                 'type': 'line',
@@ -63,7 +119,6 @@ const ChoroplethMap: FC = () => {
                     'line-width': 3,
                 },
             });
-// Add the provinces layer with province names and colors
             map.addLayer({
                 'id': 'provinces',
                 'type': 'fill',
@@ -72,13 +127,14 @@ const ChoroplethMap: FC = () => {
                 'minzoom': zoomThreshold,
                 'maxzoom': 7,
                 'paint': {
-                    'fill-color': '#731',
+                    'fill-color': ['to-color', ['concat', '#', ['get', 'adm1_tr']]],
                     'fill-opacity': 0.7,
                     'fill-outline-color': '#731',
-                }
+                },
             });
 
-// Add the district layer with district names and colors
+
+
             map.addLayer({
                 'id': 'districts',
                 'type': 'fill',
@@ -86,10 +142,10 @@ const ChoroplethMap: FC = () => {
                 'source-layer': 'tur_polbna_adm2',
                 'minzoom': 7,
                 'paint': {
-                    'fill-color': ['get', 'color'],
+                    'fill-color': ['to-color', ['concat', '#', ['get', 'OBJECTID']]],
                     'fill-opacity': 0.7,
                     'fill-outline-color': '#999',
-                }
+                },
             });
 
 // Add province names layer
@@ -142,16 +198,48 @@ const ChoroplethMap: FC = () => {
                     'line-width': 3,
                 },
             });
+            let provincesAssigned = false;
+            let districtsAssigned = false;
+
+
+
+            map.on('sourcedata', (e) => {
+                if (e.isSourceLoaded) {
+                    if (!provincesAssigned && e.sourceId === 'turkey_provinces' && map.isSourceLoaded('turkey_districts')) {
+                        const provincesFeatures = map.querySourceFeatures('turkey_provinces', {
+                            sourceLayer: 'tur_polbnda_adm1',
+                        });
+
+                        const colors = generateRegionColors(provincesFeatures, [], "province");
+                        setRegionColors(colors);
+
+                        assignProvinceColors(map, colors);
+                        provincesAssigned = true;
+                    }
+
+                    if (!districtsAssigned && e.sourceId === 'turkey_districts' && map.isSourceLoaded('turkey_provinces')) {
+                        const districtsFeatures = map.querySourceFeatures('turkey_districts', {
+                            sourceLayer: 'tur_polbnda_adm2',
+                        });
+
+                        const colors = generateRegionColors([], districtsFeatures, "district");
+                        setDistrictColors(colors);
+
+                        assignDistrictColors(map, colors);
+                        districtsAssigned = true;
+                    }
+                }
+            });
+
+
+
 
             map.on('mousemove', (e) => {
                 // Get the province feature at the mouse cursor
                 const [provinceFeature] = map.queryRenderedFeatures(e.point, {
                     layers: ['provinces'],
                 });
-
                 if (provinceFeature) {
-                    // Set the filter for the province-outline layer to match the province under the cursor
-                    // Update the state with the new selected region
                     setSelectedRegion(provinceFeature.properties.adm1_tr);
 
                     // Set the filter for the province-outline layer to match the clicked province
@@ -174,6 +262,7 @@ const ChoroplethMap: FC = () => {
                         'adm1_tr',
                         provinceFeature.properties.adm1_tr,
                     ]);
+
                 } else {
                     // Reset the filter for the province-outline layer if there's no province under the cursor
                     map.setFilter('province-outline', ['==', 'adm1_tr', '']);
@@ -216,6 +305,12 @@ const ChoroplethMap: FC = () => {
                         'adm1_tr',
                         provinceFeature.properties.adm1_tr,
                     ]);
+                    // Generate random data for the selected region
+                    const randomData = generateRandomData();
+                    setRegionData({
+                        name: provinceFeature.properties.adm1_tr,
+                        data: randomData,
+                    });
                 }
                 else {
                     // Get the district feature at the clicked point
@@ -237,6 +332,13 @@ const ChoroplethMap: FC = () => {
                         // Update the paint properties for the district-outline layer
                         map.setPaintProperty('district-outline', 'line-color', '#FF0000');
                         map.setPaintProperty('district-outline', 'line-width', 3);
+
+                        // Generate random data for the selected region
+                        const randomData = generateRandomData();
+                        setRegionData({
+                            name: districtFeature.properties.adm2_tr,
+                            data: randomData,
+                        });
                     }
                 }
 
@@ -246,23 +348,17 @@ const ChoroplethMap: FC = () => {
 
 
 
+        // Function to generate random data for the regions
+        const generateRandomData = () => {
+            const value1 = Math.floor(Math.random() * 100);
+            const value2 = Math.floor(Math.random() * (100 - value1));
+            const value3 = 100 - value1 - value2;
+            return { red: value1, yellow: value2, blue: value3 };
+        };
 
         const provinceLegendEl = document.getElementById('province-legend');
         const districtLegendEl = document.getElementById('district-legend');
 
-        map.on('sourcedata', (e) => {
-            if (e.sourceId === 'turkey_provinces' && e.isSourceLoaded) {
-                const features = map.querySourceFeatures('turkey_provinces');
-                features.forEach((feature) => {
-                    feature.properties.color = getRandomColor();
-                });
-            } else if (e.sourceId === 'turkey_districts' && e.isSourceLoaded) {
-                const features = map.querySourceFeatures('turkey_districts');
-                features.forEach((feature) => {
-                    feature.properties.color = getRandomColor();
-                });
-            }
-        });
 
         map.on('zoom', () => {
             const currentZoom = map.getZoom();
@@ -302,7 +398,7 @@ const ChoroplethMap: FC = () => {
                 <div><span style={{ backgroundColor: '#CA8323' }}></span>Örnek Değer 2</div>
                 {/* ... */}
             </div>
-
+            <RegionInfo region={selectedRegion} regionData={regionData} />
         </div>
     );
 };
