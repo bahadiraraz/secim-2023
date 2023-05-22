@@ -109,17 +109,6 @@ const ChoroplethMap: FC = () => {
 
 
             map.addLayer({
-                'id': 'province-outline',
-                'type': 'line',
-                'source': 'turkey_provinces',
-                'source-layer': 'tur_polbnda_adm1',
-                'filter': ['==', 'adm1_tr', ''],
-                'paint': {
-                    'line-color': '#FF0000',
-                    'line-width': 3,
-                },
-            });
-            map.addLayer({
                 'id': 'provinces',
                 'type': 'fill',
                 'source': 'turkey_provinces',
@@ -128,13 +117,21 @@ const ChoroplethMap: FC = () => {
                 'maxzoom': 7,
                 'paint': {
                     'fill-color': ['to-color', ['concat', '#', ['get', 'adm1_tr']]],
-                    'fill-opacity': 0.7,
+                    'fill-opacity': 1,
                     'fill-outline-color': '#731',
                 },
             });
-
-
-
+            map.addLayer({
+                'id': 'province-outline',
+                'type': 'line',
+                'source': 'turkey_provinces',
+                'source-layer': 'tur_polbnda_adm1',
+                'filter': ['==', 'adm1_tr', ''],
+                'paint': {
+                    'line-color': '#FF0000',
+                    'line-width': 5,
+                },
+            });
             map.addLayer({
                 'id': 'districts',
                 'type': 'fill',
@@ -143,10 +140,24 @@ const ChoroplethMap: FC = () => {
                 'minzoom': 7,
                 'paint': {
                     'fill-color': ['to-color', ['concat', '#', ['get', 'OBJECTID']]],
-                    'fill-opacity': 0.7,
+                    'fill-opacity': 1,
                     'fill-outline-color': '#999',
                 },
             });
+            map.addLayer({
+                'id': 'district-outline',
+                'type': 'line',
+                'source': 'turkey_districts',
+                'source-layer': 'tur_polbna_adm2',
+                'minzoom': 7,
+                'filter': ['==', 'adm2_tr', ''], // Initial filter to not highlight any district
+                'paint': {
+                    'line-color': '#FF0000',
+                    'line-width': 3,
+                },
+            });
+
+
 
 // Add province names layer
             map.addLayer({
@@ -186,18 +197,7 @@ const ChoroplethMap: FC = () => {
                     'text-halo-width': 1.5,
                 }
             });
-            map.addLayer({
-                'id': 'district-outline',
-                'type': 'line',
-                'source': 'turkey_districts',
-                'source-layer': 'tur_polbna_adm2',
-                'minzoom': 7,
-                'filter': ['==', 'adm2_tr', ''], // Initial filter to not highlight any district
-                'paint': {
-                    'line-color': '#FF0000',
-                    'line-width': 3,
-                },
-            });
+
             let provincesAssigned = false;
             let districtsAssigned = false;
 
@@ -249,7 +249,7 @@ const ChoroplethMap: FC = () => {
                         provinceFeature.properties.adm1_tr,
                     ]);
 
-                    map.setPaintProperty('province-outline', 'line-color', '#FF0000');
+                    map.setPaintProperty('province-outline', 'line-color', '#000');
                     map.setPaintProperty('province-outline', 'line-width', 3);
 
                     map.setFilter('districts', [
