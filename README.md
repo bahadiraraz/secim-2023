@@ -1,1 +1,2 @@
-<img width="1552" alt="image" src="https://user-images.githubusercontent.com/48323786/225794570-335c9c3a-c7f5-400e-b340-34a7e7238094.png">
+<img width="1552" alt="image" src="https://github.com/bahadiraraz/secim-2023/assets/48323786/05a80628-8556-4c79-ac97-5ea51814ae3d.png">
+
